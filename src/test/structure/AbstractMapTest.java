@@ -3,6 +3,7 @@ package structure;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -10,9 +11,9 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class HashMapTest {
+public class AbstractMapTest {
 
-    HashMap data = new HashMap();
+    AbstractMap data = new AbstractMap();
 
     @BeforeEach
     void setUp() {
