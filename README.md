@@ -1,7 +1,9 @@
 # my-data-structure
 Data Structure 재구현 하기
 
-## (Interface) Map 
+## Map
+
+### (Interface) Map 
 
 Key 와 Value 를 연결해주는 객체로 키를 중복해서 가질 수 없고 각 키는 적어도 하나의 값과 연결될 수 있다.
 
