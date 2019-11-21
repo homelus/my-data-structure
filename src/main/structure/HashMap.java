@@ -1,5 +1,6 @@
 package structure;
 
+import javax.swing.tree.TreeNode;
 import java.io.Serializable;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -166,6 +167,112 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     public HashMap() {
         this.loadFactor = DEFAULT_LOAD_FACTOR;
+    }
+
+    public HashMap(Map<? extends K, ? extends V> m) {
+        this.loadFactor = DEFAULT_LOAD_FACTOR;
+        putMapEntries(m, false);
+    }
+
+    final void putMapEntries(Map<? extends K, ? extends V> m, boolean evict) {
+        int s = m.size();
+        if (s > 0) {
+            if (table == null) {
+                float ft = ((float) s / loadFactor) + 1.0F;
+                int t = ((ft < (float) MAXIMUM_CAPACITY) ?
+                        (int) ft : MAXIMUM_CAPACITY);
+                if (t > threshold) {
+                    threshold = tableSizeFor(t);
+                }
+            } else if (s > threshold) {
+                resize();
+            }
+            for (Map.Entry<? extends K, ? extends V> e : m.entrySet()) {
+                K key = e.getKey();
+                V value = e.getValue();
+                putVal(hash(key), key, value, false, evict);
+            }
+        }
+    }
+
+    @Override
+    public int size() {
+        return size;
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return size == 0;
+    }
+
+    @Override
+    public V get(Object key) {
+        Node<K,V> e;
+        return (e = getNode(hash(key), key)) == null ? null : e.value;
+    }
+
+    final Node<K, V> getNode(int hash, Object key) {
+        Node<K,V>[] tab;
+        Node<K,V> first, e;
+        int n;
+        K k;
+
+        if ((tab = table) != null && (n = tab.length) > 0 &&
+                (first = tab[(n - 1) & hash]) != null) {
+            if (first.hash == hash &&
+                    ((k = first.key) == key) || (key != null && key.equals(k))) {
+                return first;
+            }
+            if ((e = first.next) != null) {
+                if (first instanceof TreeNode) {
+                    return ((TreeNode<K, V>) first).getTreeNode(hash, key);
+                }
+                do {
+                    if (e.hash == hash &&
+                            ((k = e.key) == key || (key != null && key.equals(k)))) {
+                        return e;
+                    }
+                } while ((e = e.next) != null);
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+        return getNode(hash(key), key) != null;
+    }
+
+    @Override
+    public V put(K key, V value) {
+        return putVal(hash(key), key, value, false, true);
+    }
+
+    final V putVal(int hash, K key, V value, boolean onlyIfAbsent, boolean evict) {
+        Node<K,V>[] tab;
+        Node<K,V> p;
+        int n, i;
+        if ((tab = table) == null || (n = tab.length) == 0) {
+            n = (tab = resize()).length;
+        }
+        if ((p = tab[i = (n - 1) & hash]) == null) {
+            tab[i] = newNode(hash, key, value, null);
+        } else {
+            Node<K,V> e;
+            K k;
+            if (p.hash == hash &&
+                    ((k = p.key) == key || (key != null && key.equals(k)))) {
+                e = p;
+            } else if(p instanceof TreeNode) {
+                e = ((TreeNode<K,V>) p).putTreeVal(this, tab, hash, key, value);
+            } else {
+                for (int binCount = 0; ; ++binCount) {
+                    if ((e = p.next) == null) {
+                        p.next = newNode(hash, key, value, null);
+                    }
+                }
+            }
+        }
     }
 
     @Override
