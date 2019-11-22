@@ -1,5 +1,7 @@
 package structure;
 
+import javafx.scene.control.Tab;
+
 import javax.swing.tree.TreeNode;
 import java.io.Serializable;
 import java.lang.reflect.ParameterizedType;
@@ -323,11 +325,82 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                     (int) ft : Integer.MAX_VALUE);
         }
         threshold = newThr;
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        Node<K, V>[] newTab = (Node<K, V>[]) new Node[newCap];
+        table = newTab;
+        if (oldTab != null) {
+            for (int j = 0; j < oldCap; j++) {
+                Node<K,V> e;
+                if ((e = oldTab[j]) != null) {
+                    oldTab[j] = null;
+                    if (e.next == null) {
+                        newTab[e.hash & (newCap - 1)] = e;
+                    } else if (e instanceof TreeNode) {
+                        ((TreeNode<K, V>) e).split(this, newTab, j, oldCap);
+                    } else {
+                        Node<K,V> loHead = null, loTail = null;
+                        Node<K,V> hiHead = null, hiTail = null;
+                        Node<K,V> next;
+                        do {
+                            next = e.next;
+                            if ((e.hash & oldCap) == 0) {
+                                if (loTail == null) {
+                                    loHead = e;
+                                } else {
+                                    loTail.next = e;
+                                }
+                                loTail = e;
+                            }
+                            else {
+                                if (hiTail == null) {
+                                    hiHead = e;
+                                } else {
+                                    hiTail.next = e;
+                                }
+                                hiTail = e;
+                            }
+                        } while ((e = next) != null);
+                        if (loTail != null) {
+                            loTail.next = null;
+                            newTab[j] = loHead;
+                        }
+                        if (hiTail != null) {
+                            hiTail.next = null;
+                            newTab[j + oldCap] = hiHead;
+                        }
+                    }
+                }
+            }
+        }
+        return newTab;
+    }
+
+    final void treeifyBin(Node<K, V>[] tab, int hash) {
+        int n, index;
+        Node<K,V> e;
+        if (tab == null || (n = tab.length) < MIN_TREEIFY_CAPACITY) {
+            resize();
+        } else if ((e = tab[index = (n - 1) & hash]) != null) {
+            TreeNode<K, V> hd = null, tl = null;
+            do {
+                TreeNode<K, V> p = replacementTreeNode(e, null);
+                if (tl == null) {
+                    hd = p;
+                } else {
+                    p.prev = tl;
+                    tl.next = p;
+                }
+                tl = p;
+            } while ((e = e.next) != null);
+            if ((tab[index] = hd) != null) {
+                hd.treeify(tab);
+            }
+        }
     }
 
     @Override
     public void putAll(Map<? extends K, ? extends V> m) {
-
+        putMapEntries(m, true);
     }
 
     @Override
