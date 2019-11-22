@@ -269,10 +269,60 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                 for (int binCount = 0; ; ++binCount) {
                     if ((e = p.next) == null) {
                         p.next = newNode(hash, key, value, null);
+                        if (binCount >= TREEIFY_THRESHHOLD - 1) {
+                            treeifyBin(tab, hash);
+                        }
+                        break;
                     }
+                    if (e.hash == hash &&
+                            ((k = e.key) == key || (key != null && key.equals(k)))) {
+                        break;
+                    }
+                    p = e;
                 }
             }
+            if (e != null) {
+                V oldValue = e.value;
+                if (!onlyIfAbsent || oldValue == null) {
+                    e.value = value;
+                }
+                afterNodeAccess(e);
+                return oldValue;
+            }
         }
+        ++modCount;
+        if (++size > threshold) {
+            resize();
+        }
+        afterNodeInsertion(evict);
+        return null;
+    }
+
+    final Node<K,V>[] resize() {
+        Node<K,V>[] oldTab = table;
+        int oldCap = (oldTab == null) ? 0 : oldTab.length;
+        int oldThr = threshold;
+        int newCap, newThr = 0;
+        if (oldCap > 0) {
+            if (oldCap >= MAXIMUM_CAPACITY) {
+                threshold = Integer.MAX_VALUE;
+                return oldTab;
+            } else if ((newCap = oldCap << 1) < MAXIMUM_CAPACITY &&
+                    oldCap >= DEFAULT_INITIAL_CAPACITY) {
+                newThr = oldThr << 1;
+            }
+        } else if (oldThr > 0) {
+            newCap = oldThr;
+        } else {
+            newCap = DEFAULT_INITIAL_CAPACITY;
+            newThr = (int) (DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);
+        }
+        if (newThr == 0) {
+            float ft = (float) newCap * loadFactor;
+            newThr = (newCap < MAXIMUM_CAPACITY && ft < (float) MAXIMUM_CAPACITY ?
+                    (int) ft : Integer.MAX_VALUE);
+        }
+        threshold = newThr;
     }
 
     @Override
