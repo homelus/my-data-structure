@@ -404,12 +404,90 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     }
 
     @Override
-    public void clear() {
+    public V remove(Object key) {
+        Node<K,V> e;
+        return (e = removeNode(hash(key), key, null, false, true)) == null ?
+                null : e.value;
+    }
 
+    final Node<K, V> removeNode(int hash, Object key, Object value,
+                                boolean matchValue, boolean movable) {
+        Node<K,V>[] tab;
+        Node<K,V> p;
+        int n, index;
+
+        if ((tab = table) != null && (n = tab.length) > 0 &&
+                (p = tab[index = (n - 1) & hash]) != null) {
+            Node<K,V> node = null, e;
+            K k;
+            V v;
+            if (p.hash == hash &&
+                    ((k = p.key) == key || (key != null && key.equals(k)))) {
+                node = p;
+            } else if ((e = p.next) != null) {
+                if (p instanceof TreeNode) {
+                    node = ((TreeNode<K, V>) p).getTreeNode(hash, key);
+                } else {
+                    do {
+                        if (e.hash == hash &&
+                                ((k = e.key) == key ||
+                                        (key != null && key.equals(k)))) {
+                            node = e;
+                            break;
+                        }
+                    } while ((e = e.next) != null);
+                }
+            }
+            if (node != null && (!matchValue || (v = node.value) == value ||
+                    (value != null && value.equals(v)))) {
+                if (node instanceof TreeNode) {
+                    ((TreeNode<K, V>) node).removeTreeNode(this, tab, movable);
+                } else if (node == p) {
+                    tab[index] = node.next;
+                } else {
+                    p.next = node.next;
+                }
+                ++modCount;
+                --size;
+                afterNodeRemoval(node);
+                return node;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void clear() {
+        Node<K,V>[] tab;
+        modCount++;
+        if ((tab = table) != null && size > 0) {
+            size = 0;
+            for (int i = 0; i < tab.length; ++i) {
+                tab[i] = null;
+            }
+        }
+    }
+
+    @Override
+    public boolean containsValue(Object value) {
+        Node<K,V>[] tab;
+        V v;
+        if ((tab = table) != null && size > 0) {
+            for (int i = 0; i < tab.length; ++i) {
+                for (Node<K, V> e = tab[i]; e != null; e = e.next) {
+                    if ((v = e.value) == value ||
+                            (value != null && value.equals(v))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     @Override
     public Set<K> keySet() {
+        Set<K> ks = keySet;
         return null;
     }
 
