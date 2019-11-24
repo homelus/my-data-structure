@@ -319,19 +319,111 @@ public abstract class AbstractMap<K,V> implements Map<K,V>{
     }
 
     public static class SimpleEntry<K, V> implements Entry<K, V>, Serializable {
+
+        private static final long serialVersionUID = -8499721149061103585L;
+
+        private final K key;
+        private V value;
+
+        public SimpleEntry(K key, V value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        public SimpleEntry(Entry<? extends K, ? extends V> entry) {
+            this.key = entry.getKey();
+            this.value = entry.getValue();
+        }
+
         @Override
         public K getKey() {
-            return null;
+            return key;
         }
 
         @Override
         public V getValue() {
-            return null;
+            return value;
         }
 
         @Override
         public V setValue(V value) {
-            return null;
+            V oldValue = this.value;
+            this.value = value;
+            return oldValue;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Map.Entry)) {
+                return false;
+            }
+            Map.Entry<?,?> e = (Entry<?, ?>) o;
+            return eq(key, e.getKey()) && eq(value, e.getValue());
+        }
+
+        @Override
+        public int hashCode() {
+            return (key == null ? 0 : key.hashCode()) ^
+                    (value == null ? 0 : value.hashCode());
+        }
+
+        @Override
+        public String toString() {
+            return key + "=" + value;
+        }
+    }
+
+    public static class SimpleImmutableEntry<K, V> implements Entry<K,V>, Serializable {
+
+        private static final long serialVersionUID = 7138329143949025153L;
+
+        private final K key;
+        private final V value;
+
+        public SimpleImmutableEntry(K key, V value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        public SimpleImmutableEntry(Entry<? extends K, ? extends V> entry) {
+            this.key = entry.getKey();
+            this.value = entry.getValue();
+        }
+
+        @Override
+        public K getKey() {
+            return key;
+        }
+
+        @Override
+        public V getValue() {
+            return value;
+        }
+
+        @Override
+        public V setValue(V value) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Map.Entry)) {
+                return false;
+            }
+            Map.Entry<?,?> e = (Map.Entry<?,?>) o;
+            return eq(key, e.getKey()) &&
+                    eq(value, e.getValue());
+        }
+
+        @Override
+        public int hashCode() {
+            return (key == null ? 0 : key.hashCode()) ^
+                    (value == null ? 0 : value.hashCode());
+        }
+
+        @Override
+        public String toString() {
+            return key + "=" + value;
         }
     }
 
