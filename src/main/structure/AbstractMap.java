@@ -1,8 +1,7 @@
 package structure;
 
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Set;
+import java.io.Serializable;
+import java.util.*;
 
 /**
  * @author playjun
@@ -136,7 +135,203 @@ public abstract class AbstractMap<K,V> implements Map<K,V>{
     public Set<K> keySet() {
         Set<K> ks = keySet;
         if (ks == null) {
+            ks = new AbstractSet<K>() {
+                @Override
+                public Iterator<K> iterator() {
+                    return new Iterator<K>() {
+                        private Iterator<Entry<K, V>> i = entrySet().iterator();
+                        @Override
+                        public boolean hasNext() {
+                            return i.hasNext();
+                        }
 
+                        @Override
+                        public K next() {
+                            return i.next().getKey();
+                        }
+
+                        @Override
+                        public void remove() {
+                            i.remove();
+                        }
+                    };
+                }
+
+                @Override
+                public int size() {
+                    return AbstractMap.this.size();
+                }
+
+                @Override
+                public boolean isEmpty() {
+                    return AbstractMap.this.isEmpty();
+                }
+
+                @Override
+                public void clear() {
+                    AbstractMap.this.clear();
+                }
+
+                @Override
+                public boolean contains(Object k) {
+                    return AbstractMap.this.containsKey(k);
+                }
+            };
+            keySet = ks;
+        }
+        return ks;
+    }
+
+    public Collection<V> values() {
+        Collection<V> vals = values;
+        if (vals == null) {
+            vals = new AbstractCollection<V>() {
+                @Override
+                public Iterator<V> iterator() {
+                    return new Iterator<V>() {
+                        private Iterator<Entry<K, V>> i = entrySet().iterator();
+
+                        @Override
+                        public boolean hasNext() {
+                            return i.hasNext();
+                        }
+
+                        @Override
+                        public V next() {
+                            return i.next().getValue();
+                        }
+
+                        @Override
+                        public void remove() {
+                            i.remove();
+                        }
+                    };
+                }
+
+                @Override
+                public int size() {
+                    return AbstractMap.this.size();
+                }
+
+                @Override
+                public boolean isEmpty() {
+                    return AbstractMap.this.isEmpty();
+                }
+
+                @Override
+                public void clear() {
+                    AbstractMap.this.clear();
+                }
+
+                @Override
+                public boolean contains(Object v) {
+                    return AbstractMap.this.containsValue(v);
+                }
+            };
+            values = vals;
+        }
+        return vals;
+    }
+
+    // Comparing and hashing
+
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) {
+            return true;
+        }
+
+        if (!(o instanceof Map)) {
+            return false;
+        }
+
+        Map<?,?> m = (Map<?, ?>) o;
+        if (m.size() != size()) {
+            return false;
+        }
+
+        try {
+            for (Entry<K, V> e : entrySet()) {
+                K key = e.getKey();
+                V value = e.getValue();
+
+                if (value == null) {
+                    if (!(m.get(key) == null && m.containsKey(key))) {
+                        return false;
+                    }
+                } else {
+                    if (!value.equals(m.get(key))) {
+                        return false;
+                    }
+                }
+            }
+        } catch (ClassCastException unused) {
+            return false;
+        } catch (NullPointerException unused) {
+            return false;
+        }
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int h = 0;
+        for (Entry<K,V> entry : entrySet()) {
+            h += entry.hashCode();
+        }
+        return h;
+    }
+
+    @Override
+    public String toString() {
+        Iterator<Entry<K, V>> i = entrySet().iterator();
+        if (!i.hasNext()) {
+            return "{}";
+        }
+
+        StringBuffer sb = new StringBuffer();
+        sb.append('{');
+        for (; ; ) {
+            Entry<K, V> e = i.next();
+            K key = e.getKey();
+            V value = e.getValue();
+            sb.append(key == this ? "(this Map)" : key);
+            sb.append('=');
+            sb.append(value == this ? "(this Map)" : value);
+            if (!i.hasNext()) {
+                return sb.append('}').toString();
+            }
+            sb.append(',').append(' ');
+        }
+    }
+
+    protected Object clone() throws CloneNotSupportedException{
+        AbstractMap<?,?> result = (AbstractMap<?, ?>) super.clone();
+        result.keySet = null;
+        result.values = null;
+        return result;
+    }
+
+    private static boolean eq(Object o1, Object o2) {
+        return o1 == null ? o2 == null : o1.equals(o2);
+    }
+
+    public static class SimpleEntry<K, V> implements Entry<K, V>, Serializable {
+        @Override
+        public K getKey() {
+            return null;
+        }
+
+        @Override
+        public V getValue() {
+            return null;
+        }
+
+        @Override
+        public V setValue(V value) {
+            return null;
         }
     }
 
