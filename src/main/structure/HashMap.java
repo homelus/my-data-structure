@@ -7,8 +7,10 @@ import java.io.Serializable;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Collection;
+import java.util.ConcurrentModificationException;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * @author playjun
@@ -488,16 +490,135 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     @Override
     public Set<K> keySet() {
         Set<K> ks = keySet;
+        if (ks == null) {
+            ks = new HashMap.KeySet();
+            this.keySet = (Set) ks;
+        }
         return null;
     }
 
     @Override
     public Collection<V> values() {
-        return null;
+        Collection<V> vs = this.values;
+        if (vs == null) {
+            vs = HashMap.Values();
+            this.values = (Collection) vs;
+        }
+
+        return (Collection) vs;
     }
 
     @Override
     public Set<Entry<K, V>> entrySet() {
-        return null;
+        Set es = this.entrySet
+        return es == null ? (this.entrySet = new HashMap.EntrySet()) : es;
+    }
+
+    @Override
+    public V getOrDefault(Object key, V defaultValue) {
+        HashMap.Node<K,V> e = this.getNode(hash(key), key);
+        return e == null ? defaultValue : e.value;
+    }
+
+    @Override
+    public V putIfAbsent(K key, V value) {
+        return this.putVal(hash(key), key, value, true, true);
+    }
+
+    @Override
+    public boolean remove(Object key, Object value) {
+        return this.removeNode(hash(key), key, value, true, true) != null;
+    }
+
+    @Override
+    public boolean replace(K key, V oldValue, V newValue) {
+        HashMap.Node<K, V> e;
+        Object v;
+        if ((e = this.getNode(hash(key), key)) == null || (v = e.value) != oldValue && (v == null || !v.equals(oldValue))) {
+            return false;
+        } else {
+            e.value = newValue;
+            this.afterNodeAccess(e);
+            return true;
+        }
+    }
+
+    @Override
+    public V replace(K key, V value) {
+        HashMap.Node<K,V> e;
+        if ((e = this.getNode(hash(key), key)) != null) {
+            V oldValue = e.value;
+            e.value = value;
+            this.afterNodeAccess(e);
+            return oldValue;
+        } else {
+            return null;
+        }
+    }
+
+    public V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction) {
+        if (mappingFunction == null) {
+            throw new NullPointerException();
+        } else {
+            int hash = hash(key);
+            int binCount = 0;
+            HashMap.TreeNode<K,V> t = null;
+            HashMap.Node<K,V> old = null;
+            HashMap.Node[] tab;
+            int n;
+            if (this.size > this.threshold || (tab = this.table) == null || (n = tab.length) == 0) {
+                n = (tab = this.resize()).length;
+            }
+
+            HashMap.Node<K,V> first;
+            int i;
+            Object v;
+            if ((first = tab[i = n - 1 & hash]) != null) {
+                if (first instanceof HashMap.TreeNode) {
+                    old = (t = (HashMap.TreeNode) first).getTreeNode(hash, key);
+                } else {
+                    HashMap.Node<K,V> e = first;
+                    while (e.hash != hash || (v = e.key) != key && (key == null || !key.equals(v))) {
+                        ++binCount;
+                        if ((e = e.next) == null) {
+                            break;
+                        }
+                    }
+
+                    old = e;
+                }
+            }
+
+            Object oldValue;
+            if (old != null && (oldValue = ((HashMap.Node) old).value) != null) {
+                this.afterNodeAccess((HashMap.Node) old);
+                return (V) oldValue;
+            }
+
+            int mc = this.modCount;
+            v = mappingFunction.apply(key);
+            if (mc != this.modCount) {
+                throw new ConcurrentModificationException();
+            } else if (v == null) {
+                return null;
+            } else if (old != null) {
+                ((HashMap.Node) old).value = v;
+                this.afterNodeAccess((HashMap.Node) old);
+                return (V) v;
+            } else {
+                if (t != null) {
+                    t.putTreeVal(this, tab, hash, key, v);
+                } else {
+                    tab[i] = this.newNode(hash, key, v, first);
+                    if (binCount >= 7) {
+                        this.treeifyBin(tab, hash);
+                    }
+                }
+                this.modCount = mc + 1;
+                ++this.size;
+                this.afterNodeInsertion(true);
+                return (V) v;
+            }
+        }
     }
 }
