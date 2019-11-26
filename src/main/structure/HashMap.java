@@ -10,6 +10,8 @@ import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
@@ -618,6 +620,173 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                 ++this.size;
                 this.afterNodeInsertion(true);
                 return (V) v;
+            }
+        }
+    }
+
+    public V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+        if (remappingFunction == null) {
+            throw new NullPointerException();
+        } else {
+            int hash = hash(key);
+            HashMap.Node<K,V> e;
+            V oldValue;
+            if ((e = this.getNode(hash, key)) != null && (oldValue = e.value) != null) {
+                int mc = this.modCount;
+                V v = remappingFunction.apply(key, oldValue);
+                if (mc != this.modCount) {
+                    throw new ConcurrentModificationException();
+                }
+
+                if (v != null) {
+                    e.value = v;
+                    this.afterNodeAccess(e);
+                    return v;
+                }
+
+                this.removeNode(hash, key, (Object) null, false, true);
+            }
+            return null;
+        }
+    }
+
+    public V compute(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+        if (remappingFunction == null) {
+            throw new NullPointerException();
+        }
+
+        int hash = hash(key);
+        Node<K,V>[] tab;
+        Node<K,V> first;
+        int n, i;
+        int binCount = 0;
+        HashMap.TreeNode<K,V> t = null;
+        HashMap.Node<K,V> old = null;
+        if (size > threshold || (tab = table) == null ||
+                (n = table.length) == 0) {
+            n = (tab = resize()).length;
+        }
+        if ((first = tab[i = (n - 1) & hash]) != null) {
+            if (first instanceof TreeNode) {
+                old = (t = (TreeNode<K, V>) first).getTreeNode(hash, key);
+            } else {
+                Node<K,V> e = first;
+                K k;
+                do {
+                    if (e.hash == hash &&
+                            ((k = e.key) == key) || key != null && key.equals(key)) {
+                        old = e;
+                        break;
+                    }
+                    ++binCount;
+                } while ((e = e.next) != null);
+            }
+        }
+        V oldValue = (old == null) ? null : old.value;
+        V v = remappingFunction.apply(key, oldValue);
+        if (old != null) {
+            if (v != null) {
+                old.value = v;
+                afterNodeAccess(old);
+            } else {
+                removeNode(hash, key, null, false, true);
+            }
+        } else if (v != null) {
+            if (t != null) {
+                t.putTreeVal(this, tab, hash, key, v);
+            } else {
+                tab[i] = newNode(hash, key, v, first);
+                if (binCount >= TREEIFY_THRESHHOLD - 1) {
+                    treeifyBin(tab, hash);
+                }
+            }
+            ++modCount;
+            ++size;
+            afterNodeInsertion(true);
+        }
+        return v;
+    }
+
+    public V merge(K key, V value, BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
+        if (value == null) {
+            throw new NullPointerException();
+        }
+        if (remappingFunction == null) {
+            throw new NullPointerException();
+        }
+        int hash = hash(key);
+        Node<K,V>[] tab;
+        Node<K,V> first;
+        int n, i;
+        int binCount = 0;
+        TreeNode<K,V> t = null;
+        Node<K,V> old = null;
+        if (size > threshold || (tab = table) == null ||
+                (n = tab.length) == 0) {
+            n = (tab = resize()).length;
+        }
+        if ((first = tab[i = (n - 1) & hash]) != null) {
+            if (first instanceof TreeNode) {
+                old = (t = (TreeNode<K, V>) first).getTreeNode(hash, key);
+            } else {
+                Node<K,V> e = first;
+                K k;
+                do {
+                    if (e.hash == hash &&
+                            ((k = e.key) == key || (key != null && key.equals(k)))) {
+                        old = e;
+                        break;
+                    }
+                    ++binCount;
+                } while ((e = e.next) != null);
+            }
+        }
+        if (old != null) {
+            V v;
+            if (old.value != null) {
+                v = remappingFunction.apply(old.value, value);
+            } else {
+                v = value;
+            }
+            if (v != null) {
+                old.value = v;
+                afterNodeAccess(old);
+            } else {
+                removeNode(hash, key, null, false, true);
+            }
+            return v;
+        }
+        if (value != null) {
+            if (t != null) {
+                t.putTreeVal(this, tab, hash, key, value);
+            } else {
+                tab[i] = newNode(hash, key, value, first);
+                if (binCount >= TREEIFY_THRESHHOLD - 1) {
+                    treeifyBin(tab, hash);
+                }
+            }
+            ++modCount;
+            ++size;
+            afterNodeInsertion(true);
+        }
+        return value;
+    }
+
+    @Override
+    public void forEach(BiConsumer<? super K, ? super V> action) {
+        Node<K,V>[] tab;
+        if (action == null) {
+            throw new NullPointerException();
+        }
+        if (size > 0 && (tab = table) != null) {
+            int mc = modCount;
+            for (int i = 0; i < tab.length; ++i) {
+                for (Node<K, V> e = tab[i]; e != null; e = e.next) {
+                    action.accept(e.key, e.value);
+                }
+            }
+            if (modCount != mc) {
+                throw new ConcurrentModificationException();
             }
         }
     }
