@@ -1,13 +1,20 @@
 package structure;
 
 import javafx.scene.control.Tab;
+import sun.misc.SharedSecrets;
 
 import javax.swing.tree.TreeNode;
+import java.io.IOException;
+import java.io.InvalidObjectException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -790,4 +797,170 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             }
         }
     }
+
+    @Override
+    public void replaceAll(BiFunction<? super K, ? super V, ? extends V> function) {
+        Node<K,V>[] tab;
+        if (function == null) {
+            throw new NullPointerException();
+        }
+        if (size > 0 && (tab = table) != null) {
+            int mc = modCount;
+            for (int i = 0; i < tab.length; ++i) {
+                for (Node<K, V> e = tab[i]; e != null; e = e.next) {
+                    e.value = function.apply(e.key, e.value);
+                }
+            }
+            if (modCount != mc) {
+                throw new ConcurrentModificationException();
+            }
+        }
+    }
+
+    // Cloning and serialization
+
+    @Override
+    protected Object clone() throws CloneNotSupportedException {
+        HashMap<K,V> result;
+        try {
+            result = (HashMap<K, V>) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new InternalError(e);
+        }
+        result.reinitialize();
+        result.putMapEntries(this, false);
+        return result;
+    }
+
+    final float loadFactor() {
+        return loadFactor;
+    }
+
+    final int capacity() {
+        return (table != null) ? table.length :
+                (threshold > 0) ? threshold :
+                        DEFAULT_INITIAL_CAPACITY;
+    }
+
+    private void writeObject(ObjectOutputStream s) throws IOException {
+        int buckets = capacity();
+
+        s.defaultWriteObject();
+        s.writeInt(buckets);
+        s.writeInt(size);
+        internalWriteEntries(s);
+    }
+
+    private void readObject(ObjectInputStream s) throws IOException, ClassNotFoundException {
+        s.defaultReadObject();
+        reinitialize();
+        if (loadFactor <= 0 || Float.isNaN(loadFactor)) {
+            throw new InvalidObjectException("Illegal load factor: " + loadFactor);
+        }
+        s.readInt();
+        int mappings = s.readInt();
+        if (mappings < 0) {
+            throw new InvalidObjectException("Illegal mappings count: " + mappings);
+        } else if (mappings > 0) {
+            float lf = Math.min(Math.max(0.25f, loadFactor), 4.0f);
+            float fc = (float) mappings / lf + 1.0f;
+            int cap = ((fc < DEFAULT_INITIAL_CAPACITY) ?
+                    DEFAULT_INITIAL_CAPACITY : (fc >= MAXIMUM_CAPACITY) ?
+                    MAXIMUM_CAPACITY : tableSizeFor((int) fc));
+            float ft = (float) cap * lf;
+            threshold = ((cap < MAXIMUM_CAPACITY && ft < MAXIMUM_CAPACITY) ?
+                    (int) ft : Integer.MAX_VALUE);
+
+            SharedSecrets.getJavaOISAccess().checkArray(s, Map.Entry[].class, cap);
+            @SuppressWarnings({"rawtypes", "unchecked"})
+            Node<K, V>[] tab = (Node<K, V>[]) new Node[cap];
+            table = tab;
+
+            for (int i = 0; i < mappings; i++) {
+                @SuppressWarnings("unchecked")
+                K key = (K) s.readObject();
+                @SuppressWarnings("unchecked")
+                V value = (V) s.readObject();
+                putVal(hash(key), key, value, false, false);
+            }
+        }
+    }
+
+    // iterators
+
+    abstract class HashIterator {
+        Node<K,V> next;
+        Node<K,V> current;
+        int expectedModCount;
+        int index;
+
+        HashIterator() {
+            expectedModCount = modCount;
+            Node<K,V>[] t = table;
+            current = next = null;
+            index = 0;
+            if (t != null && size > 0) {
+                do {
+                } while (index < t.length && (next = t[index++]) == null);
+            }
+        }
+
+        public final boolean hasNext() {
+            return next != null;
+        }
+
+        final Node<K, V> nextNode() {
+            Node<K,V>[] t;
+            Node<K,V> e = next;
+            if (modCount != expectedModCount) {
+                throw new ConcurrentModificationException();
+            }
+            if (e == null) {
+                throw new NoSuchElementException();
+            }
+            if ((next = (current = e).next) == null && (t = table) != null) {
+                do {
+                }
+                while (index < t.length && (next = t[index++]) == null);
+            }
+            return e;
+        }
+
+        public final void remove() {
+            Node<K,V> p = current;
+            if (p == null) {
+                throw new IllegalStateException();
+            }
+            if (modCount != expectedModCount) {
+                throw new ConcurrentModificationException();
+            }
+            current = null;
+            K key = p.key;
+            removeNode(hash(key), key, null, false, false);
+            expectedModCount = modCount;
+        }
+
+        final class KeyIterator extends HashIterator implements Iterator<K> {
+            @Override
+            public K next() {
+                return nextNode().key;
+            }
+        }
+
+        final class ValueIterator extends HashIterator implements Iterator<V> {
+            @Override
+            public V next() {
+                return nextNode().value;
+            }
+        }
+
+        final class EntryIterator extends HashIterator implements Iterator<Map.Entry<K, V>> {
+            @Override
+            public final Entry<K, V> next() {
+                return nextNode();
+            }
+        }
+    }
+
+    // spliterators
 }
