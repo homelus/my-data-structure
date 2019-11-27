@@ -963,4 +963,25 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     }
 
     // spliterators
+    static class HashMapSpliterator<K, V> {
+        final HashMap<K,V> map;
+        Node<K,V> current;
+        int index;
+        int fence;
+        int est;
+        int expectedModCount;
+
+        HashMapSpliterator(HashMap<K,V> m, int origin,
+                           int fence, int est,
+                           int expectedModCount) {
+            this.map = m;
+            this.index = origin;
+            this.fence = fence;
+            this.est = est;
+            this.expectedModCount = expectedModCount;
+        }
+
+    }
+
+
 }
