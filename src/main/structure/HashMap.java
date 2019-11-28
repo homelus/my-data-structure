@@ -17,8 +17,10 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Spliterator;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -981,7 +983,104 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             this.expectedModCount = expectedModCount;
         }
 
+        final int getFence() {
+            int hi;
+            if ((hi = fence) < 0) {
+                HashMap<K,V> m = map;
+                est = m.size;
+                expectedModCount = m.modCount;
+                Node<K,V>[] tab = m.table;
+                hi = fence = (tab == null) ? 0 : tab.length;
+            }
+            return hi;
+        }
+
+        public final long estimateSize() {
+            getFence();
+            return (long) est;
+        }
+
     }
+
+    static final class KeySpliterator<K, V> extends HashMapSpliterator<K, V> implements Spliterator<K> {
+
+        KeySpliterator(HashMap<K, V> m, int origin, int fence, int est, int expectedModCount) {
+            super(m, origin, fence, est, expectedModCount);
+        }
+
+        @Override
+        public boolean tryAdvance(Consumer<? super K> action) {
+            int hi;
+            if (action == null) {
+                throw new NullPointerException();
+            }
+            Node<K,V>[] tab = map.table;
+            if (tab != null && tab.length >= (hi = getFence()) && index >= 0) {
+                while (current != null || index < hi) {
+                    if (current == null) {
+                        current = tab[index++];
+                    } else {
+                        K k = current.key;
+                        current = current.next;
+                        action.accept(k);
+                        if (map.modCount != expectedModCount) {
+                            throw new ConcurrentModificationException();
+                        }
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public Spliterator<K> trySplit() {
+            int hi = getFence(), lo = index, mid = (lo + hi) >>> 1;
+            return (lo >= mid || current != null) ? null :
+                    new KeySpliterator<>(map, lo, index = mid, est >>>= 1, expectedModCount);
+        }
+
+        @Override
+        public void forEachRemaining(Consumer<? super K> action) {
+            int i, hi, mc;
+            if (action == null) {
+                throw new NullPointerException();
+            }
+            HashMap<K,V> m = map;
+            Node<K,V>[] tab = m.table;
+            if ((hi = fence) < 0) {
+                mc = expectedModCount = m.modCount;
+                hi = fence = (tab == null) ? 0 : tab.length;
+            }
+            else {
+                mc = expectedModCount;
+            }
+            if (tab != null && tab.length >= hi &&
+                    (i = index) >= 0 && (i < (index = hi) || current != null)) {
+                Node<K,V> p = current;
+                current = null;
+                do {
+                    if (p == null) {
+                        p = tab[i++];
+                    } else {
+                        action.accept(p.key);
+                        p = p.next;
+                    }
+                } while (p != null || i < hi);
+                if (m.modCount != mc) {
+                    throw new ConcurrentModificationException();
+                }
+            }
+        }
+
+        @Override
+        public int characteristics() {
+            return (fence < 0 || est == map.size ? Spliterator.SIZED : 0) |
+                    Spliterator.DISTINCT;
+        }
+    }
+
+
 
 
 }
