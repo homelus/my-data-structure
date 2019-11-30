@@ -1080,7 +1080,73 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         }
     }
 
+    // LinkedHashMap support
 
+    Node<K,V> newNode(int hash,  K key, V value, Node<K,V> next) {
+        return new Node<>(hash, key, value, next);
+    };
 
+    Node<K,V> replacementNode(Node<K,V> p, Node<K,V> next) {
+        return new Node<>(p.hash, p.key, p.value, next);
+    }
+
+    TreeNode<K, V> newTreeNode(int hash, K key, V value, Node<K,V> next) {
+        return new TreeNode<>(hash, key, value, next);
+    }
+
+    TreeNode<K, V> replacementTreeNode(Node<K, V> p, Node<K, V> next) {
+        return new TreeNode<>(p.hash, p.key, p.value, next);
+    }
+
+    void reinitialize() {
+        table = null;
+        entrySet = null;
+        keySet = null;
+        values  = null;
+        modCount = 0;
+        threshold = 0;
+        size = 0;
+    }
+
+    // Callbacks to allow LinkedHashMap post-actions
+    void afterNodeAccess(Node<K,V> p) {}
+    void afterNodeInsertion(boolean evict) {};
+    void afterNodeRemoval(Node<K,V> p) {};
+
+    // Called only from writeObject, to ensure compatible ordering
+    void internalWriteEntries(ObjectOutputStream s) throws IOException {
+        Node<K,V>[] tab;
+        if (size > 0 && (tab = table) != null) {
+            for (int i = 0; i < tab.length; ++i) {
+                for (Node<K, V> e = tab[i]; e != null; e = e.next) {
+                    s.writeObject(e.key);
+                    s.writeObject(e.value);
+                }
+            }
+        }
+    }
+
+    // Tree bins
+    static final class TreeNode<K, V> extends LinkedHashMap.Entry<K, V> {
+
+        TreeNode<K,V> parent;
+        TreeNode<K,V> left;
+        TreeNode<K,V> right;
+        TreeNode<K,V> prev;
+        boolean red;
+
+        public TreeNode(int hash, K key, V value, Node<K, V> next) {
+            super(hash, key, value, next);
+        }
+
+        final TreeNode<K, V> root() {
+            for (TreeNode<K,V> r = this, p;;) {
+                if ((p = r.parent) == null) {
+                    return r;
+                }
+                r = p;
+            }
+        }
+    }
 
 }
