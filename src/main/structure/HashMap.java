@@ -11,6 +11,8 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.AbstractCollection;
+import java.util.AbstractSet;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
@@ -230,7 +232,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         Node<K,V>[] tab;
         Node<K,V> first, e;
         int n;
-        K k;
+        K k = null;
 
         if ((tab = table) != null && (n = tab.length) > 0 &&
                 (first = tab[(n - 1) & hash]) != null) {
@@ -502,27 +504,127 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     public Set<K> keySet() {
         Set<K> ks = keySet;
         if (ks == null) {
-            ks = new HashMap.KeySet();
+            ks = new KeySet();
             this.keySet = (Set) ks;
         }
         return null;
     }
 
+     final class KeySet extends AbstractSet<K> {
+        @Override
+        public int size() {
+            return size;
+        }
+
+        @Override
+        public void clear() {
+            HashMap.this.clear();
+        }
+
+        @Override
+        public Iterator<K> iterator() {
+            return new KeyIterator();
+        }
+
+         @Override
+         public boolean contains(Object o) {
+             return containsKey(o);
+         }
+
+         @Override
+         public boolean remove(Object key) {
+             return removeNode(hash(key), key, null, false, true) != null;
+         }
+
+         @Override
+         public Spliterator<K> spliterator() {
+             return new KeySpliterator<>(HashMap.this, 0, -1, 0, 0);
+         }
+
+         @Override
+         public void forEach(Consumer<? super K> action) {
+             Node<K,V>[] tab;
+             if (action == null) {
+                 throw new NullPointerException();
+             }
+             if (size > 0 && (tab = table) != null) {
+                 int mc = modCount;
+                 for (int i = 0; i < tab.length; ++i) {
+                     for (Node<K, V> e = tab[i]; e != null; e = e.next) {
+                         action.accept(e.key);
+                     }
+                 }
+                 if (modCount != mc) {
+                     throw new ConcurrentModificationException();
+                 }
+             }
+         }
+     }
+
     @Override
     public Collection<V> values() {
         Collection<V> vs = this.values;
         if (vs == null) {
-            vs = HashMap.Values();
+            vs = new Values();
             this.values = (Collection) vs;
         }
 
         return (Collection) vs;
     }
 
+    final class Values extends AbstractCollection<V> {
+
+        @Override
+        public int size() {
+            return size;
+        }
+
+        @Override
+        public void clear() {
+            HashMap.this.clear();
+        }
+
+        @Override
+        public Iterator<V> iterator() {
+            return new ValueIterator();
+        }
+
+        @Override
+        public boolean contains(Object o) {
+            return containsValue(o);
+        }
+
+        @Override
+        public Spliterator<V> spliterator() {
+            return new ValueSpliterator<>(HashMap.this, 0, 01, 0, 0);
+        }
+
+        @Override
+        public void forEach(Consumer<? super V> action) {
+            Node<K,V>[] tab;
+            if (action == null) {
+                throw new NullPointerException();
+            }
+            if (size > 0 && (tab = table) != null) {
+                int mc = modCount;
+                for (int i = 0; i < tab.length; ++i) {
+                    for (Node<K, V> e = tab[i]; e != null; e = e.next) {
+                        action.accept(e.value);
+                    }
+                }
+                if (modCount != mc) {
+                    throw new ConcurrentModificationException();
+                }
+            }
+
+        }
+    }
+
+
     @Override
     public Set<Entry<K, V>> entrySet() {
         Set es = this.entrySet
-        return es == null ? (this.entrySet = new HashMap.EntrySet()) : es;
+        return es == null ? (this.entrySet = new EntrySet()) : es;
     }
 
     @Override
@@ -941,26 +1043,26 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             removeNode(hash(key), key, null, false, false);
             expectedModCount = modCount;
         }
+    }
 
-        final class KeyIterator extends HashIterator implements Iterator<K> {
-            @Override
-            public K next() {
-                return nextNode().key;
-            }
+    final class KeyIterator extends HashIterator implements Iterator<K> {
+        @Override
+        public K next() {
+            return nextNode().key;
         }
+    }
 
-        final class ValueIterator extends HashIterator implements Iterator<V> {
-            @Override
-            public V next() {
-                return nextNode().value;
-            }
+    final class ValueIterator extends HashIterator implements Iterator<V> {
+        @Override
+        public V next() {
+            return nextNode().value;
         }
+    }
 
-        final class EntryIterator extends HashIterator implements Iterator<Map.Entry<K, V>> {
-            @Override
-            public final Entry<K, V> next() {
-                return nextNode();
-            }
+    final class EntryIterator extends HashIterator implements Iterator<Map.Entry<K, V>> {
+        @Override
+        public final Entry<K, V> next() {
+            return nextNode();
         }
     }
 
@@ -1080,6 +1182,86 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         }
     }
 
+    static final class ValueSpliterator<K, V> extends HashMapSpliterator<K,V> implements Spliterator<V> {
+
+        ValueSpliterator(HashMap<K, V> m, int origin, int fence, int est, int expectedModCount) {
+            super(m, origin, fence, est, expectedModCount);
+        }
+
+        @Override
+        public Spliterator<V> trySplit() {
+            int hi = getFence(), lo = index, mid = (lo + hi) >>> 1;
+            return (lo >= mid || current != null) ? null :
+                    new ValueSpliterator<>(map, lo, index = mid, est >>>= 1, expectedModCount);
+        }
+
+        @Override
+        public void forEachRemaining(Consumer<? super V> action) {
+            int i, hi, mc;
+            if (action == null) {
+                throw new NullPointerException();
+            }
+            HashMap<K,V> m = map;
+            Node<K,V>[] tab = m.table;
+
+            if ((hi = fence) < 0) {
+                mc = expectedModCount = m.modCount;
+                hi = fence = (tab == null) ? 0 : tab.length;
+            }
+            else {
+                mc = expectedModCount;
+            }
+
+            if (tab != null && tab.length >= hi &&
+                    (i = index) >= 0 && (i < (index = hi) || current != null)) {
+                Node<K,V> p = current;
+                current = null;
+                do {
+                    if (p == null) {
+                        p = tab[i++];
+                    } else {
+                        action.accept(p.value);
+                        p = p.next;
+                    }
+                } while (p != null || i < hi);
+            }
+            if (m.modCount != mc) {
+                throw new ConcurrentModificationException();
+            }
+        }
+
+        @Override
+        public boolean tryAdvance(Consumer<? super V> action) {
+            int hi;
+            if (action == null) {
+                throw new NullPointerException();
+            }
+            Node<K,V>[] tab = map.table;
+            if (tab != null && tab.length >= (hi = getFence()) && index >= 0) {
+                while (current != null || index < hi) {
+                    if (current == null) {
+                        current = tab[index++];
+                    }
+                    else {
+                        V v = current.value;
+                        current = current.next;
+                        action.accept(v);
+                        if (map.modCount != expectedModCount) {
+                            throw new ConcurrentModificationException();
+                        }
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public int characteristics() {
+            return (fence < 0 || est == map.size ? Spliterator.SIZED : 0);
+        }
+    }
+
     // LinkedHashMap support
 
     Node<K,V> newNode(int hash,  K key, V value, Node<K,V> next) {
@@ -1135,7 +1317,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         TreeNode<K,V> prev;
         boolean red;
 
-        public TreeNode(int hash, K key, V value, Node<K, V> next) {
+        TreeNode(int hash, K key, V value, Node<K, V> next) {
             super(hash, key, value, next);
         }
 
@@ -1146,6 +1328,66 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                 }
                 r = p;
             }
+        }
+
+        static <K, V> void moveRootToFront(Node<K, V>[] tab, TreeNode<K, V> root) {
+
+        }
+
+        final TreeNode<K,V> find(int h, Object k, Class<?> kc) {
+            TreeNode<K,V> p = this;
+
+            return p;
+        }
+
+        final TreeNode<K, V> getTreeNode(int h, Object k) {
+            return ((parent != null) ? root() : this).find(h, k, null);
+        }
+
+        static int tieBreakOrder(Object a, Object object) {
+            int d = 0;
+            return d;
+        }
+
+        final void treeify(Node<K, V>[] tab) {
+
+        }
+
+        final Node<K, V> untreeify(HashMap<K, V> map) {
+            Node<K,V> hd = null , tl = null;
+            return hd;
+        }
+
+        final TreeNode<K, V> putTreeVal(HashMap<K, V> map, Node<K, V>[] tab, int h, K k, V v) {
+            return null;
+        }
+
+        final void removeTreeNode(HashMap<K, V> map, Node<K, V>[] tab, boolean movable) {
+
+        }
+
+        final void split(HashMap<K, V> map, Node<K, V>[] tab, int index, int bit) {
+
+        }
+
+        static <K, V> TreeNode<K, V> rotateLeft(TreeNode<K,V> root, TreeNode<K,V> p) {
+            return null;
+        }
+
+        static <K, V> TreeNode<K, V> rotateRight(TreeNode<K, V> root, TreeNode<K, V> p) {
+            return null;
+        }
+
+        static <K, V> TreeNode<K, V> balanceInsertion(TreeNode<K, V> root, TreeNode<K, V> x) {
+            return null;
+        }
+
+        static <K, V> TreeNode<K, V> balanceDeletion(TreeNode<K, V> root, TreeNode<K, V> x) {
+            return null;
+        }
+
+        static <K, V> boolean checkInvariants(TreeNode<K, V> treeNode) {
+            return true;
         }
     }
 
