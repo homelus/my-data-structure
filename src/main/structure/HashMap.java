@@ -623,8 +623,72 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     @Override
     public Set<Entry<K, V>> entrySet() {
-        Set es = this.entrySet
-        return es == null ? (this.entrySet = new EntrySet()) : es;
+        Set<Map.Entry<K,V>> es;
+        return (es = entrySet) == null ? (this.entrySet = new EntrySet()) : es;
+    }
+
+    final class EntrySet extends AbstractSet<Map.Entry<K,V>> {
+
+        @Override
+        public Iterator<Entry<K, V>> iterator() {
+            return new EntryIterator();
+        }
+
+        @Override
+        public int size() {
+            return size;
+        }
+
+        @Override
+        public void clear() {
+            HashMap.this.clear();
+        }
+
+        @Override
+        public boolean contains(Object o) {
+            if (!(o instanceof Map.Entry)) {
+                return false;
+            }
+            Map.Entry<?,?> e = (Map.Entry<?,?>) o;
+            Object key = e.getKey();
+            Node<K, V> candidate = getNode(hash(key), key);
+            return candidate != null && candidate.equals(e);
+        }
+
+        @Override
+        public boolean remove(Object o) {
+            if (o instanceof Map.Entry) {
+                Map.Entry<?,?> e = (Map.Entry<?,?>) o;
+                Object key = e.getKey();
+                Object value = e.getValue();
+                return removeNode(hash(key), key, value, true, true) != null;
+            }
+            return false;
+        }
+
+        @Override
+        public Spliterator<Entry<K, V>> spliterator() {
+            return new EntrySpliterator<>(HashMap.this, 0, -1, 0, 0);
+        }
+
+        @Override
+        public void forEach(Consumer<? super Entry<K, V>> action) {
+            Node<K,V>[] tab;
+            if (action == null) {
+                throw new NullPointerException();
+            }
+            if (size > 0 && (tab = table) != null) {
+                int mc = modCount;
+                for (int i = 0; i < tab.length; ++i) {
+                    for (Node<K,V> e = tab[i]; e != null; e = e.next) {
+                        action.accept(e);
+                    }
+                }
+                if (modCount != mc) {
+                    throw new ConcurrentModificationException();
+                }
+            }
+        }
     }
 
     @Override
@@ -672,67 +736,60 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     public V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction) {
         if (mappingFunction == null) {
             throw new NullPointerException();
-        } else {
-            int hash = hash(key);
-            int binCount = 0;
-            HashMap.TreeNode<K,V> t = null;
-            HashMap.Node<K,V> old = null;
-            HashMap.Node[] tab;
-            int n;
-            if (this.size > this.threshold || (tab = this.table) == null || (n = tab.length) == 0) {
-                n = (tab = this.resize()).length;
-            }
+        }
 
-            HashMap.Node<K,V> first;
-            int i;
-            Object v;
-            if ((first = tab[i = n - 1 & hash]) != null) {
-                if (first instanceof HashMap.TreeNode) {
-                    old = (t = (HashMap.TreeNode) first).getTreeNode(hash, key);
-                } else {
-                    HashMap.Node<K,V> e = first;
-                    while (e.hash != hash || (v = e.key) != key && (key == null || !key.equals(v))) {
-                        ++binCount;
-                        if ((e = e.next) == null) {
-                            break;
-                        }
-                    }
+        int hash = hash(key);
+        Node<K,V>[] tab;
+        Node<K,V> first;
+        int n, i;
+        int binCount = 0;
+        HashMap.TreeNode<K,V> t = null;
+        HashMap.Node<K,V> old = null;
 
-                    old = e;
-                }
-            }
-
-            Object oldValue;
-            if (old != null && (oldValue = ((HashMap.Node) old).value) != null) {
-                this.afterNodeAccess((HashMap.Node) old);
-                return (V) oldValue;
-            }
-
-            int mc = this.modCount;
-            v = mappingFunction.apply(key);
-            if (mc != this.modCount) {
-                throw new ConcurrentModificationException();
-            } else if (v == null) {
-                return null;
-            } else if (old != null) {
-                ((HashMap.Node) old).value = v;
-                this.afterNodeAccess((HashMap.Node) old);
-                return (V) v;
+        if (this.size > this.threshold || (tab = this.table) == null || (n = tab.length) == 0) {
+            n = (tab = this.resize()).length;
+        }
+        if ((first = tab[i = n - 1 & hash]) != null) {
+            if (first instanceof HashMap.TreeNode) {
+                old = (t = (HashMap.TreeNode) first).getTreeNode(hash, key);
             } else {
-                if (t != null) {
-                    t.putTreeVal(this, tab, hash, key, v);
-                } else {
-                    tab[i] = this.newNode(hash, key, v, first);
-                    if (binCount >= 7) {
-                        this.treeifyBin(tab, hash);
+                Node<K, V> e = first;
+                K k;
+                do {
+                    if (e.hash == hash &&
+                            ((k = e.key) == key || (key != null && key.equals(k)))) {
+                        old = e;
+                        break;
                     }
-                }
-                this.modCount = mc + 1;
-                ++this.size;
-                this.afterNodeInsertion(true);
-                return (V) v;
+                    ++binCount;
+                } while ((e = e.next) != null);
             }
         }
+        V oldValue;
+        if (old != null && (oldValue = old.value) != null) {
+            afterNodeAccess(old);
+            return oldValue;
+        }
+
+        V v = mappingFunction.apply(key);
+        if (v == null) {
+            return null;
+        } else if (old != null) {
+            old.value = v;
+            afterNodeAccess(old);
+            return v;
+        } else if (t != null) {
+            t.putTreeVal(this, tab, hash, key, v);
+        } else {
+            tab[i] = newNode(hash, key, v, first);
+            if (binCount >= TREEIFY_THRESHHOLD - 1) {
+                treeifyBin(tab, hash);
+            }
+        }
+        ++modCount;
+        ++size;
+        afterNodeInsertion(true);
+        return v;
     }
 
     public V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
@@ -1259,6 +1316,85 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         @Override
         public int characteristics() {
             return (fence < 0 || est == map.size ? Spliterator.SIZED : 0);
+        }
+    }
+
+    static final class EntrySpliterator<K,V> extends HashMapSpliterator<K,V> implements Spliterator<Map.Entry<K,V>> {
+
+        EntrySpliterator(HashMap<K, V> m, int origin, int fence, int est, int expectedModCount) {
+            super(m, origin, fence, est, expectedModCount);
+        }
+
+        @Override
+        public EntrySpliterator<K, V> trySplit() {
+            int hi = getFence(), lo = index, mid = (lo + hi) >>> 1;
+            return (lo >= mid || current != null) ? null :
+                    new EntrySpliterator<>(map, lo, index = mid, est >>>= 1, expectedModCount);
+        }
+
+        @Override
+        public boolean tryAdvance(Consumer<? super Entry<K, V>> action) {
+            int hi;
+            if (action == null) {
+                throw new NullPointerException();
+            }
+            Node<K,V>[] tab = map.table;
+            if (tab != null && tab.length >= (hi = getFence()) && index >= 0) {
+                while (current != null || index < hi) {
+                    if (current == null) {
+                        current = tab[index++];
+                    }
+                    else {
+                        Node<K,V> e = current;
+                        current = current.next;
+                        action.accept(e);
+                        if (map.modCount != expectedModCount) {
+                            throw new ConcurrentModificationException();
+                        }
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public void forEachRemaining(Consumer<? super Entry<K, V>> action) {
+            int i, hi, mc;
+            if (action == null) {
+                throw new NullPointerException();
+            }
+            HashMap<K,V> m = map;
+            Node<K, V>[] tab = m.table;
+            if ((hi = fence) < 0) {
+                mc = expectedModCount = m.modCount;
+                hi = fence = (tab == null) ? 0 : tab.length;
+            }
+            else {
+                mc = expectedModCount;
+            }
+            if (tab != null && tab.length >= hi &&
+                    (i = index) >= 0 && (i < (index = hi) || current != null)) {
+                Node<K, V> p = current;
+                current = null;
+                do {
+                    if (p == null) {
+                        p = tab[i++];
+                    } else {
+                        action.accept(p);
+                        p = p.next;
+                    }
+                } while (p != null || i < hi);
+                if (m.modCount != mc) {
+                    throw new ConcurrentModificationException();
+                }
+            }
+        }
+
+        @Override
+        public int characteristics() {
+            return (fence < 0 || est == map.size ? Spliterator.SIZED : 0) |
+                    Spliterator.DISTINCT;
         }
     }
 
