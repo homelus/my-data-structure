@@ -1,4 +1,4 @@
-package structure;
+package structure.map;
 
 public class LinkedHashMap {
 
