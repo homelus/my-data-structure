@@ -246,7 +246,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                 }
                 do {
                     if (e.hash == hash &&
-                            ((k = e.key) == key || (key != null && key.equals(k)))) {
+                            ((k = e.key) == key || (key != null )&& key.equals(k))) {
                         return e;
                     }
                 } while ((e = e.next) != null);
