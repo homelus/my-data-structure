@@ -57,4 +57,54 @@ public interface ConcurrentMap<K,V> extends Map<K,V> {
                 ? newValue
                 : oldValue;
     }
+
+    default V compute(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+        retry: for (;;) {
+            V oldValue = get(key);
+            haveOldValue: for (;;) {
+                V newValue = remappingFunction.apply(key, oldValue);
+                if (newValue != null) {
+                    if (oldValue != null) {
+                        if (replace(key, oldValue, newValue)) {
+                            return newValue;
+                        }
+                    } else if ((oldValue = putIfAbsent(key, newValue)) == null) {
+                        return newValue;
+                    } else {
+                        continue haveOldValue;
+                    }
+                } else if (oldValue == null || remove(key, oldValue)) {
+                    return null;
+                }
+                continue retry;
+            }
+        }
+    }
+
+    @Override
+    default V merge(K key, V value, BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
+        Objects.requireNonNull(remappingFunction);
+        Objects.requireNonNull(value);
+        retry: for(;;) {
+            V oldValue = get(key);
+            haveOldValue: for(;;) {
+                if (oldValue != null) {
+                    V newValue = remappingFunction.apply(oldValue, value);
+                    if (newValue != null) {
+                        if (replace(key, oldValue, newValue)) {
+                            return newValue;
+                        }
+                    } else if (remove(key, oldValue)) {
+                        return null;
+                    }
+                    continue retry;
+                } else {
+                    if ((oldValue = putIfAbsent(key, value)) == null) {
+                        return value;
+                    }
+                    continue haveOldValue;
+                }
+            }
+        }
+    }
 }
