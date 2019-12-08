@@ -4,10 +4,12 @@ Data Structure 재구현 하기
 
 ## Map
 
+### HashMap
+
 Map 을 재구현하며 클래스에서 사용하는 알고리즘과 코딩 스타일을 익힌다.
 기본적인 클래스의 구현 방법을 배울 수 있을 것 같다. 
 
-### (Interface) Map 
+#### (Interface) Map 
 
 Key 와 Value 를 연결해주는 객체로 키를 중복해서 가질 수 없고 각 키는 적어도 하나의 값과 연결될 수 있다.
 
@@ -17,7 +19,7 @@ Key 와 Value 를 연결해주는 객체로 키를 중복해서 가질 수 없�
 사용법에 대해 주석에 자세하게 나와있으므로 한번 일독하기를 권하고 실제 메서드를 구현해보면 FunctionalInterface 의 응용활용방법을
 익힐 수 있을 것 같다.
 
-### (Abstract Class) AbstractMap
+#### (Abstract Class) AbstractMap
 
 Map Interface 의 스켈레톤 구현체이다.
 
@@ -33,7 +35,7 @@ equals, hashCode, toString 메서드를 재구현하며 우리가 간과하는 �
 Map Interface 의 Entry Sub Interface 를 구현한 구현체들을 제공하는데 SimpleEntry 와 SimpleImmutableEntry 이다.
 이름에서 보는대로 값을 변경할 수 있는지에 따라 구분된다.
 
-### (Class) HashMap
+#### (Class) HashMap
 
 Hash 기반의 Map 구현체이다.
 
@@ -48,7 +50,7 @@ Hash 기반으로 데이터를 조작하므로 추가(put), 조회(get) 시 상�
 
 이 구조에서 저장하려는 객체의 `quals`메서드를 이용해 유일한 키를 식별한다.
 
-#### 검색
+##### 검색
 
 **Node 타입의 배열**의 인덱스를 구하기 위해 객체의 해시코드를 보조 해시 함수를 이용해 인덱스로 선택한다.
 
@@ -59,5 +61,4 @@ Hash 기반으로 데이터를 조작하므로 추가(put), 조회(get) 시 상�
 
 해당 Node 는 연결리스트 혹은 트리구조로 되어 있으므로 해당 자료구조를 순회하며 `equals()` 연산자로 비교하여 정확한 키값을 찾는다.
 
-
-
+### ConcurrentHashMap
