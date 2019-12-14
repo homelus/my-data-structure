@@ -1,8 +1,9 @@
 package stream;
 
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.Set;
+import structure.collection.Collection;
+import structure.map.Map;
+
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
@@ -19,6 +20,43 @@ public final class Collectors {
             = Collections.unmodifiableSet(EnumSet.of(Collector.Characteristics.IDENTITY_FINISH));
 
     static final Set<Collector.Characteristics> CH_NOID = Collections.emptySet();
+
+    private Collectors() {}
+
+    private static IllegalStateException duplicateKeyException(Object k, Object u, Object v) {
+        return new IllegalStateException(String.format("Duplicate key %s (attempted merging values %s and %s)", k, u, v));
+    }
+
+    private static <K, V, M extends Map<K, V>> BinaryOperator<M> uniqKeysMapMerger() {
+        return (m1, m2) -> {
+            for (Map.Entry<K, V> e : m2.entrySet()) {
+                K k = e.getKey();
+                V v = Objects.requireNonNull(e.getValue());
+                V u = m1.putIfAbsent(k, v);
+                if (u != null) {
+                    throw duplicateKeyException(k, u, v);
+                }
+            }
+            return m1;
+        };
+    }
+
+    private static <T, K, V> BiConsumer<Map<K, V>, T> uniqKeysMapAccumulator(Function<? super T, ? extends K> keyMapper,
+                                                                             Function<? super T, ? extends V> valueMapper) {
+        return (map, element) -> {
+            K k = keyMapper.apply(element);
+            V v = Objects.requireNonNull(valueMapper.apply(element));
+            V u = map.putIfAbsent(k, v);
+            if (u != null) {
+                throw duplicateKeyException(k, u, v);
+            }
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <I, R> Function<I, R> castingIdentity() {
+        return i -> (R) i;
+    }
 
     static class CollectorImpl<T,A,R> implements Collector<T,A,R> {
         private final Supplier<A> supplier;
@@ -73,5 +111,11 @@ public final class Collectors {
             return characteristics;
         }
     }
+
+    public static <T, C extends Collection<T>>
+        Collector<T, ? , C> toCollection(Supplier<C> collectionFactory) {
+
+    }
+
 
 }
