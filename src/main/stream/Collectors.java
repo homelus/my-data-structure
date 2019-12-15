@@ -114,7 +114,9 @@ public final class Collectors {
 
     public static <T, C extends Collection<T>>
         Collector<T, ? , C> toCollection(Supplier<C> collectionFactory) {
-
+        return new CollectorImpl<>(collectionFactory, Collection<T>::add,
+                (r1, r2) -> { r1.addAll(r2); return r1; },
+                CH_ID);
     }
 
 
