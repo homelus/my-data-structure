@@ -1,4 +1,4 @@
-package structure;
+package structure.map;
 
 import java.io.Serializable;
 import java.util.*;

@@ -2,6 +2,8 @@ package structure;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import structure.map.HashMap;
+import structure.map.Map;
 
 import java.util.Set;
 

@@ -1,9 +1,5 @@
-package structure;
+package structure.map;
 
-import javafx.scene.control.Tab;
-import sun.misc.SharedSecrets;
-
-import javax.swing.tree.TreeNode;
 import java.io.IOException;
 import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
@@ -1032,7 +1028,6 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             threshold = ((cap < MAXIMUM_CAPACITY && ft < MAXIMUM_CAPACITY) ?
                     (int) ft : Integer.MAX_VALUE);
 
-            SharedSecrets.getJavaOISAccess().checkArray(s, Map.Entry[].class, cap);
             @SuppressWarnings({"rawtypes", "unchecked"})
             Node<K, V>[] tab = (Node<K, V>[]) new Node[cap];
             table = tab;
