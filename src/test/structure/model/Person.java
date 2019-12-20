@@ -16,7 +16,6 @@ public class Person {
             Person p = (Person) obj;
             return id.equals(p.getId()) && name.equals(p.getName());
         }
-
         return false;
     }
 
