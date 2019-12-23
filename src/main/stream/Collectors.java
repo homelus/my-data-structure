@@ -19,6 +19,10 @@ public final class Collectors {
     static final Set<Collector.Characteristics> CH_ID
             = Collections.unmodifiableSet(EnumSet.of(Collector.Characteristics.IDENTITY_FINISH));
 
+    static final Set<Collector.Characteristics> CH_UNORDERED_ID
+            = Collections.unmodifiableSet(EnumSet.of(Collector.Characteristics.UNORDERED,
+            Collector.Characteristics.IDENTITY_FINISH));
+
     static final Set<Collector.Characteristics> CH_NOID = Collections.emptySet();
 
     private Collectors() {}
@@ -119,5 +123,52 @@ public final class Collectors {
                 CH_ID);
     }
 
+    public static <T> Collector<T, ?, List<T>> toList() {
+        return new CollectorImpl<>((Supplier<List<T>>) ArrayList::new, List::add,
+                (left, right) -> { left.addAll(right); return left; },
+                CH_ID);
+    }
+
+    public static <T> Collector<T, ?, Set<T>> toSet() {
+        return new CollectorImpl<>((Supplier<Set<T>>) HashSet::new, Set::add,
+        (left, right) -> {left.addAll(right); return left;}, CH_UNORDERED_ID);
+    }
+
+    public static Collector<CharSequence, ?, String> joining() {
+        return new CollectorImpl<>(
+                StringBuilder::new, StringBuilder::append,
+                (r1, r2) -> {
+                    r1.append(r2);
+                    return r1;
+                },
+                StringBuilder::toString, CH_NOID);
+    }
+
+    public static Collector<CharSequence, ?, String> joining(CharSequence delimiter,
+                                                             CharSequence prefix,
+                                                             CharSequence suffix) {
+        return new CollectorImpl<>(
+                () -> new StringJoiner(delimiter, prefix, suffix),
+                StringJoiner::add, StringJoiner::merge,
+                StringJoiner::toString, CH_NOID);
+    }
+
+    private static <K, V, M extends Map<K, V>> BinaryOperator<M> mapMerger(BinaryOperator<V> mergeFunction) {
+        return (m1, m2) -> {
+            for (Map.Entry<K, V> e : m2.entrySet()) {
+                m1.merge(e.getKey(), e.getValue(), mergeFunction);
+            }
+            return m1;
+        };
+    }
+
+    public static <T, U, A, R> Collector<T, ?, R> mapping(Function<? super T, ? extends U> mapper,
+                                                          Collector<? super U, A, R> downstream) {
+        BiConsumer<A, ? super U> downstreamAccumulator = downstream.accumulator();
+        return new CollectorImpl<>(downstream.supplier(),
+                (r, t) -> downstreamAccumulator.accept(r, mapper.apply(t)),
+                downstream.combiner(), downstream.finisher(),
+                downstream.characteristics());
+    }
 
 }

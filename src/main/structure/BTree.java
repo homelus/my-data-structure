@@ -154,7 +154,7 @@ public class BTree<Key extends Comparable<Key>, Value> {
 
         if (ht == 0) {
             for (int j = 0; j < h.m; j++) {
-                s.append(indent + children[j].key + " " + children[j].key + ")\n");
+                s.append(indent + children[j].key + " " + children[j].key + "\n");
             }
         } else {
             for (int j = 0; j < h.m; j++) {
