@@ -62,9 +62,6 @@ public interface Collection<E> extends Iterable<E> {
 
     int hashCode();
 
-    default Spliterator<E> spliterator() {
-        return Spliterators.split
-    }
 
 
 }
